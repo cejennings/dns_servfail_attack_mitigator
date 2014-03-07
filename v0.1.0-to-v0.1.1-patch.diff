@@ -1,0 +1,40 @@
+From 19fb5298ded52c21e8d524744e37766bb8161528 Mon Sep 17 00:00:00 2001
+From: Charles Jennings <cejennings_cr@yahoo.com>
+Date: Thu, 6 Mar 2014 10:40:28 -0600
+Subject: [PATCH] No TLD blocking.
+
+---
+ dns_attack_mitigation.sh | 10 ++++++----
+ 1 file changed, 6 insertions(+), 4 deletions(-)
+
+diff --git a/dns_attack_mitigation.sh b/dns_attack_mitigation.sh
+index b662997..60f4412 100644
+--- a/dns_attack_mitigation.sh
++++ b/dns_attack_mitigation.sh
+@@ -6,7 +6,7 @@
+ #: Last Edit   : Feb 27, 2014
+ #: Author      : Charles Jennings
+ #:             : ( cejennings_cr {@} yahoo.com )
+-#: Version     : 0.1.0 (20140227)
++#: Version     : 0.1.1 (20140306)
+ #: Description : This script will take a snapshot of the last 
+ #                SERVFAIL errors logged by BIND named as defined by 
+ #                certain limits below.  The script will then evaluate 
+@@ -169,9 +169,11 @@ populatearrays () {
+                 let temp_epoch=$item_epoch
+                 item_ip[$i]=`echo $value | gawk -v xx=$column_of_ip_addr '{ print $xx }' | cut -d\# -f1`
+                 item_domain[$i]=`echo $value | gawk -v xx=$column_of_fqdn '{ print $xx }' | cut -d\/ -f1`
+-                item_domain_depth[$i]=`echo ${item_domain[$i]} | gawk -F. '{ print NF }'`
+-                if [ $item_epoch -gt $time_trigger ]; then
+-                        let i=$i+1
++                let item_domain_depth[$i]=`echo ${item_domain[$i]} | gawk -F. '{ print NF }'`
++                if [ ${item_domain_depth[$i]} -gt 2 ]; then
++                        if [ $item_epoch -gt $time_trigger ]; then
++                                let i=$i+1
++                        fi
+                 fi
+                 let z=$i%100
+                 let ii=$ii+1
+-- 
+1.9.0.msysgit.0
+
