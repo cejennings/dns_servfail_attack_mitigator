@@ -472,7 +472,7 @@ evaluate_hits () {
 
 clean_up () {
         let rules_ctr=`iptables -nvL ${iptables_chain} --line-number | grep DNS_ATTACK_MITIGATION | wc -l`
-        echo $rules_ctr
+#        echo $rules_ctr
 }
 
 current_epoch=`date +%s`
