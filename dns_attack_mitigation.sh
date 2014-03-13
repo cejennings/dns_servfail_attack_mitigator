@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #: Title       : dns_servfail_attack_mitigator.sh
-#:             : (c) 2014, Charles Jennings, released under GPLv3
+#:             : (c) 2014, Charles Jennings, released under GPLv2
 #: Date Created: Feb 17, 2014
-#: Last Edit   : Feb 27, 2014
+#: Last Edit   : Mar 13, 2014
 #: Author      : Charles Jennings
 #:             : ( cejennings_cr {@} yahoo.com )
-#: Version     : 0.1.1 (20140306)
+#: Version     : 0.2.0 (20140313)
 #: Description : This script will take a snapshot of the last 
 #                SERVFAIL errors logged by BIND named as defined by 
 #                certain limits below.  The script will then evaluate 
@@ -17,6 +17,9 @@
 #                default this script will alert only, but the script
 #                can be enabled to automatically block domains found
 #                to be under attack.
+#                During non-attack periods, if configured to auto-
+#                block, the script will check for expired rules,
+#                based on the configured timeframe, and remove rules.
 
 #####################################################################
 ###                  Customization Area Below                     ###
