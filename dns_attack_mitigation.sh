@@ -501,7 +501,6 @@ clean_up () {
                 fi
         done
         echo >> $emailmessage
-        echo "# End #" >> $emailmessage
         #------------
         IFS=$oldifs
         rm -f $workingfile
