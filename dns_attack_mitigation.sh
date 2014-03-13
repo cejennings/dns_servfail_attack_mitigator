@@ -1,12 +1,12 @@
 #!/bin/bash
 
 #: Title       : dns_servfail_attack_mitigator.sh
-#:             : (c) 2014, Charles Jennings, released under GPLv3
+#:             : (c) 2014, Charles Jennings, released under GPLv2
 #: Date Created: Feb 17, 2014
-#: Last Edit   : Feb 27, 2014
+#: Last Edit   : Mar 13, 2014
 #: Author      : Charles Jennings
 #:             : ( cejennings_cr {@} yahoo.com )
-#: Version     : 0.1.1 (20140306)
+#: Version     : 0.2.0 (20140313)
 #: Description : This script will take a snapshot of the last 
 #                SERVFAIL errors logged by BIND named as defined by 
 #                certain limits below.  The script will then evaluate 
@@ -17,6 +17,9 @@
 #                default this script will alert only, but the script
 #                can be enabled to automatically block domains found
 #                to be under attack.
+#                During non-attack periods, if configured to auto-
+#                block, the script will check for expired rules,
+#                based on the configured timeframe, and remove rules.
 
 #####################################################################
 ###                  Customization Area Below                     ###
@@ -38,13 +41,14 @@
 ## - mitigation WILL NOT occur.  If mitigation is active, reporting
 ## - via email will still occur.
 
-let report_only_fleg=1     # 1=Yes, 0=No
+let report_only_flag=1     # 1=Yes, 0=No
 let mitigate_attack=0      # 1=Yes, 0=No
 
 ## - email configuration:
 
 email_subject_report_only="`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
 email_subject_mitigated="`hostname` under DNS SERVFAIL attack - Mitigation has occured"
+email_subject_rule_cleanup="`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
 
 ## - - Separate email addresses with comma
 
@@ -124,6 +128,10 @@ let block_trigger_value=15
 ## - domains.
 
 iptables_chain="INPUT"
+
+## - Define how long before blocking rule is removed (in hours)
+
+let block_removal=48
 
 #####################################################################
 ###               Do Not Edit Below This Line                     ###
@@ -327,7 +335,7 @@ evaluate_hits () {
                         ip_weight[$i]=$working_ip_weight
                         let i=$i+1
                 fi
-                done
+        done
         #------------
         value=""
         previous_domain=`head -n 1 $domainsortedfile | gawk '{ print $1 }'`
@@ -416,7 +424,7 @@ evaluate_hits () {
                                 hexstring="${hexstring}${hexpartone}${hexparttwo}"
                         done
                         mitigation_cmd="-A ${iptables_chain} -p udp -m string --hex-string ${dblquote}${vertbar}${hexstring}${vertbar}${dblquote} --algo bm  --to 65535 -m comment --comment ${dblquote}DNS_ATTACK_MITIGATION: Drop DNS domain: ${domain_name[$i]} at ${current_epoch}${dblquote} -j DROP"
-                        if [ $report_only_fleg = 0 ]; then
+                        if [ $report_only_flag = 0 ]; then
                                 if [ $mitigate_attack = 1 ]; then
                                         let mitigation_taken=1
                                         iptables_restore_file=$(mktemp)
@@ -471,8 +479,35 @@ evaluate_hits () {
 }
 
 clean_up () {
+        #------------
+        workingfile=$(mktemp)
+        workingfile2=$(mktemp)
+        oldifs=$IFS
+        IFS=$'\n'
         let rules_ctr=`iptables -nvL ${iptables_chain} --line-number | grep DNS_ATTACK_MITIGATION | wc -l`
-#        echo $rules_ctr
+        iptables -nvL ${iptables_chain} --line-number | grep DNS_ATTACK_MITIGATION | gawk '{ print $1 " " $25 " " $23 }' > $workingfile
+        tac $workingfile > $workingfile2
+        let block_removal_sec=$block_removal*3600
+        let block_removal_trigger=$current_epoch-$block_removal_sec
+        #------------
+        echo "# Start #" > $emailmessage
+        echo >> $emailmessage
+        for value in `cat $workingfile2`
+        do
+                let rule_ptr=`echo $value | gawk '{ print $1 }'`
+                let rule_stamp=`echo $value | gawk '{ print $2 }'`
+                stamp_date=`date -d @$rule_stamp +"%Y-%m-%d %T %z"`
+                rule_domain=`echo $value | gawk '{ print $3 }'`
+                if [ $rule_stamp -lt $block_removal_trigger ]; then
+                        echo "Rule Number: $rule_ptr || Time Stamp: of $stamp_date || Domain: $rule_domain - removed from iptables" >> $emailmessage
+                        iptables -D ${iptables_chain} $rule_ptr
+                fi
+        done
+        echo >> $emailmessage
+        #------------
+        IFS=$oldifs
+        rm -f $workingfile
+        rm -f $workingfile2
 }
 
 current_epoch=`date +%s`
@@ -490,6 +525,7 @@ else if [ $needs_review = 1 ]; then
                 mailit $email_destination "$email_subject_report_only"
         else
                 clean_up
+                mailit $email_destination "$email_subject_rule_cleanup"
         fi
 fi
 rm -f $emailmessage
