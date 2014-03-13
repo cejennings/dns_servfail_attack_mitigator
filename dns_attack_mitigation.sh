@@ -6,7 +6,7 @@
 #: Last Edit   : Mar 13, 2014
 #: Author      : Charles Jennings
 #:             : ( cejennings_cr {@} yahoo.com )
-#: Version     : 0.2.0 (20140313)
+#: Version     : 0.3.0 (20140313)
 #: Description : This script will take a snapshot of the last 
 #                SERVFAIL errors logged by BIND named as defined by 
 #                certain limits below.  The script will then evaluate 
@@ -20,6 +20,37 @@
 #                During non-attack periods, if configured to auto-
 #                block, the script will check for expired rules,
 #                based on the configured timeframe, and remove rules.
+#
+#                Configuration Options:
+#                The script will look for its default file at: 
+#                   /etc/dns_servfail_attack_mitigator.conf
+#                you can provide a user configuration file using:
+#                   -c user_supplied_config_file
+#                The config file MUST have 600 permissions and be
+#                owned by the user running the script (root in most
+#                cases).
+#                If no file found, the default options here listed
+#                will be used:
+#
+#                report_only_flag:            1
+#                mitigate_attack:             0
+#                email_subject_report_only:   "`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
+#                email_subject_mitigated:     "`hostname` under DNS SERVFAIL attack - Mitigation has occured"
+#                email_subject_rule_cleanup:  "`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
+#                email_destination:           "jdoe@example.com,john.doe@example.com"
+#                named_debug_log_file:        /chroot/named/logs/dns_limiting.log
+#                named_debug_log_file0:       /chroot/named/logs/dns_limiting.log.0
+#                max_records:                 15000
+#                max_time:                    300
+#                column_of_ip_addr:           7
+#                column_of_fqdn:              12
+#                ip_qpm_heavy_rate:           60
+#                ip_qpm_midweight_rate:       40
+#                ip_qpm_light_rate:           20
+#                min_mal_ip_per_domain:       5
+#                block_trigger_value:         15
+#                iptables_chain:              "INPUT"
+#                block_removal:               48
 
 #####################################################################
 ###               Do Not Edit Below This Line                     ###
