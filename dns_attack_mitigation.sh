@@ -489,6 +489,7 @@ clean_up () {
         tac $workingfile > $workingfile2
         let block_removal_sec=$block_removal*3600
         let block_removal_trigger=$current_epoch-$block_removal_sec
+        let iptables_clean_flag=0
         #------------
         echo "# Start #" > $emailmessage
         echo >> $emailmessage
@@ -501,6 +502,7 @@ clean_up () {
                 if [ $rule_stamp -lt $block_removal_trigger ]; then
                         echo "Rule Number: $rule_ptr || Time Stamp: of $stamp_date || Domain: $rule_domain - removed from iptables" >> $emailmessage
                         iptables -D ${iptables_chain} $rule_ptr
+                        let iptables_clean_flag=1
                 fi
         done
         echo >> $emailmessage
@@ -525,7 +527,9 @@ else if [ $needs_review = 1 ]; then
                 mailit $email_destination "$email_subject_report_only"
         else
                 clean_up
-                mailit $email_destination "$email_subject_rule_cleanup"
+                if [ $iptables_clean_flag -eq 1 ]; then
+                    mailit $email_destination "$email_subject_rule_cleanup"
+                fi
         fi
 fi
 rm -f $emailmessage
