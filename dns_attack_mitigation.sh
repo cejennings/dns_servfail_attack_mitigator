@@ -45,6 +45,7 @@ let mitigate_attack=0      # 1=Yes, 0=No
 
 email_subject_report_only="`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
 email_subject_mitigated="`hostname` under DNS SERVFAIL attack - Mitigation has occured"
+email_subject_rule_cleanup="`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
 
 ## - - Separate email addresses with comma
 
@@ -486,16 +487,25 @@ clean_up () {
         let block_removal_sec=$block_removal*3600
         let block_removal_trigger=$current_epoch-$block_removal_sec
         #------------
+        echo "# Start #" > $emailmessage
+        echo >> $emailmessage
         for value in `cat $workingfile2`
         do
                 let rule_ptr=`echo $value | gawk '{ print $1 }'`
                 let rule_stamp=`echo $value | gawk '{ print $2 }'`
-                let rule_domain=`echo $value | gawk '{ print $3 }'`
+                stamp_date=`date -d @$rule_stamp +"%Y-%m-%d %T %z"`
+                rule_domain=`echo $value | gawk '{ print $3 }'`
                 if [ $rule_stamp -lt $block_removal_trigger ]; then
-                        echo "Rule number $rule_ptr with a time stamp of $rule_stamp is previous than $block_removal_trigger"
+                        echo "Rule Number: $rule_ptr || Time Stamp: of $stamp_date || Domain: $rule_domain - removed from iptables" >> $emailmessage
+                        iptables -D ${iptables_chain} $rule_ptr
                 fi
         done
+        echo >> $emailmessage
+        echo "# End #" >> $emailmessage
+        #------------
         IFS=$oldifs
+        rm -f $workingfile
+        rm -f $workingfile2
 }
 
 current_epoch=`date +%s`
@@ -513,6 +523,7 @@ else if [ $needs_review = 1 ]; then
                 mailit $email_destination "$email_subject_report_only"
         else
                 clean_up
+                mailit $email_destination "$email_subject_rule_cleanup"
         fi
 fi
 rm -f $emailmessage
