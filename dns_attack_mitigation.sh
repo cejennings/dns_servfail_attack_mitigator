@@ -6,7 +6,7 @@
 #: Last Edit   : Mar 13, 2014
 #: Author      : Charles Jennings
 #:             : ( cejennings_cr {@} yahoo.com )
-#: Version     : 0.2.0 (20140313)
+#: Version     : 0.3.0 (20140313)
 #: Description : This script will take a snapshot of the last 
 #                SERVFAIL errors logged by BIND named as defined by 
 #                certain limits below.  The script will then evaluate 
@@ -20,122 +20,88 @@
 #                During non-attack periods, if configured to auto-
 #                block, the script will check for expired rules,
 #                based on the configured timeframe, and remove rules.
-
-#####################################################################
-###                  Customization Area Below                     ###
-#####################################################################
-
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!                                                          !!!!!
-#!!!!!  On evaluation of a domain that needs to be blocked,     !!!!!
-#!!!!!                                                          !!!!!
-#!!!!!  Report Only or Mitigate and perform actual block.       !!!!!
-#!!!!!                                                          !!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-#!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
 #
-## - For mitigation to take place, report_only_flag MUST be set to 0
-## - AND mitigate_attack MUST be set to 1.  If report_only_flag is 
-## - anything but 0 and mitigate_attack anything but 1, active
-## - mitigation WILL NOT occur.  If mitigation is active, reporting
-## - via email will still occur.
-
-let report_only_flag=1     # 1=Yes, 0=No
-let mitigate_attack=0      # 1=Yes, 0=No
-
-## - email configuration:
-
-email_subject_report_only="`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
-email_subject_mitigated="`hostname` under DNS SERVFAIL attack - Mitigation has occured"
-email_subject_rule_cleanup="`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
-
-## - - Separate email addresses with comma
-
-email_destination="jdoe@example.com,john.doe@example.com"
-
-## - Provide the log file location where ISC BIND logs SERVFAIL 
-## - notifications. (BIND > v9.7.0a1) 
-## - - You MUST provide both the current file and the most recent 
-## - - rotated file. 
-## - - Your named.conf configuration for this log file MUST have the 
-## - - following settings in the "channel xxx {};" config for the 
-## - - "category query-errors {};" config: 
-## - - (Note specifically the number of versions must be greater or 
-## - - equal to 2 with sufficient size to get the max_records below 
-## - - and each entry needs to be logged with a timestamp.)
-##
-## - -     file "/path/to/file/filename.ext" versions 2 size 20m;
-## - -     print-time yes;
-##
-
-named_debug_log_file=/chroot/named/logs/dns_limiting.log
-named_debug_log_file0=/chroot/named/logs/dns_limiting.log.0
-
-## - Define specifics about reading the above mentioned log files.
-## - - Depending on server speed and number of logged entries, the
-## - - max_records should be tuned such that reading and evaluation
-## - - of the log files leaves approximately 2 minutes of idle time
-## - - beforethe next cron job rotation begins.  If the server is not
-## - - under attack, specify the max_time in seconds to read from the
-## - - log files. 
-
-let max_records=15000
-let max_time=300
-
-## - - Next define the location of key elements in the log file 
-## - - (columns in log file are read as space delimited).
-## - - - (Confirm that the date is in column 1 and the time is in 
-## - - - column 2.)
-
-let column_of_ip_addr=7
-let column_of_fqdn=12
-#let column_of_fqdn=14
-
-## - Define the values that will trigger a response from the script.
-## - - Queries per minute from any one IP considered "Heavy"
-## - - If any IP gets this rate, it will be given the weight of "3"
-
-let ip_qpm_heavy_rate=60
-
-## - - Queries per minute from any one IP considered "Midweight"
-## - - If any IP gets this rate, it will be given the weight of "2"
-
-let ip_qpm_midweight_rate=40
-
-## - - Queries per minute from any one IP considered "Light"
-## - - If any IP gets this rate, it will be given the weight of "1"
-
-let ip_qpm_light_rate=20
-
-## - This multiplier flags a domain to be evaluated at "Light Weight"
-## - - A domain will be flagged for evaluation if the number of hits
-## - - is equal to or greater than this number multiplied by 
-## - - ip_qpm_light_rate in a 60 second timeframe. (calculated out 
-## - - if less than 60 seconds are captured)
-
-let min_mal_ip_per_domain=5
-
-## - This multiplier flags a domain to be blocked at "Heavy Weight"
-## - - This value causes a domain to be triggered for blocking as a
-## - - multiplier of the "Heavy Weight". (In other words, this value
-## - - times 3 - or this number of Heavy Weighted IPs would cause a
-## - - block)
-
-let block_trigger_value=15
-
-## - Define the iptables chain to append the rule to use for blocking
-## - domains.
-
-iptables_chain="INPUT"
-
-## - Define how long before blocking rule is removed (in hours)
-
-let block_removal=48
+#                Configuration Options:
+#                The script will look for its default file at: 
+#                   /etc/dns_servfail_attack_mitigator.conf
+#                you can provide a user configuration file using:
+#                   -c user_supplied_config_file
+#                The config file MUST have 600 permissions and be
+#                owned by the user running the script (root in most
+#                cases).
+#                If no file found, the default options here listed
+#                will be used:
+#
+#                report_only_flag:            1
+#                mitigate_attack:             0
+#                email_subject_report_only:   "`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
+#                email_subject_mitigated:     "`hostname` under DNS SERVFAIL attack - Mitigation has occured"
+#                email_subject_rule_cleanup:  "`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
+#                email_destination:           "jdoe@example.com,john.doe@example.com"
+#                named_debug_log_file:        /chroot/named/logs/dns_limiting.log
+#                named_debug_log_file0:       /chroot/named/logs/dns_limiting.log.0
+#                max_records:                 15000
+#                max_time:                    300
+#                column_of_ip_addr:           7
+#                column_of_fqdn:              12
+#                ip_qpm_heavy_rate:           60
+#                ip_qpm_midweight_rate:       40
+#                ip_qpm_light_rate:           20
+#                min_mal_ip_per_domain:       5
+#                block_trigger_value:         15
+#                iptables_chain:              "INPUT"
+#                block_removal:               48
 
 #####################################################################
 ###               Do Not Edit Below This Line                     ###
 #####################################################################
+##
+
+if [[ $1 == -c ]]; then
+    CONFIG_FILE=$2
+else
+    CONFIG_FILE=/etc/dns_servfail_attack_mitigator.conf
+fi
+
+if [[ -f $CONFIG_FILE ]]; then
+    if [[ -O $CONFIG_FILE ]]; then
+        if [[ $(stat --format %a $CONFIG_FILE) == 600 ]]; then
+            . $CONFIG_FILE
+        else
+            echo "Configuration file MUST have 600 rights - exiting script"
+            exit 9
+        fi
+    else
+        echo "Configuration file MUST be owned by effective user (root) - exiting script"
+        exit 8
+    fi
+else
+    echo "No configuration file found or specified - using default values"
+fi
+
+## - Configuration Option Defaults:
+
+let report_only_flag=${report_only_flag:-1}
+let mitigate_attack=${mitigate_attack:-0}
+email_subject_report_only=${email_subject_report_only:-"`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"}
+email_subject_mitigated=${email_subject_mitigated:-"`hostname` under DNS SERVFAIL attack - Mitigation has occured"}
+email_subject_rule_cleanup=${email_subject_rule_cleanup:-"`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"}
+email_destination=${email_destination:-"jdoe@example.com,john.doe@example.com"}
+named_debug_log_file=${named_debug_log_file:-/chroot/named/logs/dns_limiting.log}
+named_debug_log_file0=${named_debug_log_file0:-/chroot/named/logs/dns_limiting.log.0}
+let max_records=${max_records:-15000}
+let max_time=${max_time:-300}
+let column_of_ip_addr=${column_of_ip_addr:-7}
+let column_of_fqdn=${column_of_fqdn:-12}
+let ip_qpm_heavy_rate=${ip_qpm_heavy_rate:-60}
+let ip_qpm_midweight_rate=${ip_qpm_midweight_rate:-40}
+let ip_qpm_light_rate=${ip_qpm_light_rate:-20}
+let min_mal_ip_per_domain=${min_mal_ip_per_domain:-5}
+let block_trigger_value=${block_trigger_value:-15}
+iptables_chain=${iptables_chain:-"INPUT"}
+let block_removal=${block_removal:-48}
+
+##
 
 mailit () {
         echo "# End #" >> $emailmessage
