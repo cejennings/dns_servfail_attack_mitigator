@@ -127,6 +127,7 @@ populatearrays () {
         workingfile2=$(mktemp)
         tac $named_debug_log_file $named_debug_log_file0 > $workingfile
         sed -n -e '/SERVFAIL/p' $workingfile | sed -e '/\!/d' > $workingfile2
+        sed -i -e 's/\\032/ /g' $workingfile2
         oldifs=$IFS
         IFS=$'\n'
         let i=0
@@ -264,7 +265,7 @@ evaluate_hits () {
         ipsortfile=$(mktemp)
         ipsortedfile=$(mktemp)
         for (( i = 0 ; i < counter ; i++ )); do
-                printf "${item_domain_sans_hostpart[$i]} ${item_ip[$i]}\n" >> $domainsortfile
+                echo "${item_domain_sans_hostpart[$i]} ${item_ip[$i]}" >> $domainsortfile
                 printf "${item_ip[$i]}\n" >> $ipsortfile
         done
         sort $domainsortfile > $domainsortedfile
