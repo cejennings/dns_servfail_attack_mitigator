@@ -3,10 +3,10 @@
 #: Title       : dns_servfail_attack_mitigator.sh
 #:             : (c) 2014, Charles Jennings, released under GPLv2
 #: Date Created: Feb 17, 2014
-#: Last Edit   : Mar 13, 2014
+#: Last Edit   : Jun 02, 2014
 #: Author      : Charles Jennings
 #:             : ( cejennings_cr {@} yahoo.com )
-#: Version     : 0.3.0 (20140313)
+#: Version     : 0.3.1 (20140602)
 #: Description : This script will take a snapshot of the last 
 #                SERVFAIL errors logged by BIND named as defined by 
 #                certain limits below.  The script will then evaluate 
@@ -34,6 +34,7 @@
 #
 #                report_only_flag:            1
 #                mitigate_attack:             0
+#                summarize_report:            1
 #                email_subject_report_only:   "`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"
 #                email_subject_mitigated:     "`hostname` under DNS SERVFAIL attack - Mitigation has occured"
 #                email_subject_rule_cleanup:  "`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"
@@ -83,6 +84,7 @@ fi
 
 let report_only_flag=${report_only_flag:-1}
 let mitigate_attack=${mitigate_attack:-0}
+let summarize_report=${summarize_report:-1}
 email_subject_report_only=${email_subject_report_only:-"`hostname` under DNS SERVFAIL attack - Report Only - No Mitigation actions taken"}
 email_subject_mitigated=${email_subject_mitigated:-"`hostname` under DNS SERVFAIL attack - Mitigation has occured"}
 email_subject_rule_cleanup=${email_subject_rule_cleanup:-"`hostname` DNS SERVFAIL attack - iptables Rule Cleanup has occured"}
@@ -104,7 +106,7 @@ let block_removal=${block_removal:-48}
 ##
 
 mailit () {
-        echo "# End #" >> $emailmessage
+        echo "# End: `date` #" >> $emailmessage
         let mail_address_count=`echo $1 | gawk -F, '{ print NF }'`
         for (( y =1 ; y <= mail_address_count ; y++ )); do
                 destmail=`echo $1 | gawk -F, -v yy=$y '{ print $yy }'`
@@ -133,6 +135,8 @@ populatearrays () {
         let i=0
         let ii=0
         #------------
+        echo "# Start: `date` #" > $emailmessage
+        echo "# Start: `date` #" > $summaryemail
         echo "Populating Arrays" >> $emailmessage
         echo "" >> $emailmessage
         echo "  (each # represents 100 records)" >> $emailmessage
@@ -414,6 +418,7 @@ evaluate_hits () {
                                 let z=$z/2
                                 spaceit $z
                                 printf "${domain_name[$i]} has been blocked." >> $emailmessage
+                                echo "${domain_name[$i]} has been blocked with a total weight of $trigger over $trigger_weight required." >> $summaryemail
                                 x=70-6-18-${#domain_name[$i]}-$z
                                 spaceit $x
                         else
@@ -422,6 +427,7 @@ evaluate_hits () {
                                 let z=$z/2
                                 spaceit $z
                                 printf "${domain_name[$i]} needs review." >> $emailmessage
+                                echo "${domain_name[$i]} needs review  with a total weight of $trigger over $trigger_weight required." >> $summaryemail
                                 x=70-6-14-${#domain_name[$i]}-$z
                                 spaceit $x
                                 
@@ -482,11 +488,18 @@ clean_up () {
 current_epoch=`date +%s`
 let time_trigger=$current_epoch-$max_time
 emailmessage=$(mktemp)
+summaryemail=$(mktemp)
 let mitigation_taken=0
 let needs_review=0
 
 populatearrays
 evaluate_hits
+
+if [ $summarize_report = 1 ]; then
+    tmpmessage=$emailmessage
+    emailmessage=$summaryemail
+    rm -f $tmpmessage
+fi
 
 if [ $mitigation_taken = 1 ]; then
         mailit $email_destination "$email_subject_mitigated"
@@ -500,4 +513,5 @@ else if [ $needs_review = 1 ]; then
         fi
 fi
 rm -f $emailmessage
+rm -f $summaryemail
 exit 0
